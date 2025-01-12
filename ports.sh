@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# Install iptables-persistent if not installed
+# Install iptables-persistent silently if not installed
 if ! dpkg -l | grep -q iptables-persistent; then
-    apt-get update
-    apt-get install -y iptables-persistent
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    apt-get install -y -qq iptables-persistent > /dev/null 2>&1
 fi
 
 # Ask for the OpenVPN client IP
