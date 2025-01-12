@@ -10,17 +10,13 @@ fi
 # Ask for the OpenVPN client IP
 read -p "Enter the OpenVPN client IP: " CLIENT_IP
 
-# Ask for the ports to forward (comma separated)
-read -p "Enter the ports you want to forward (comma separated): " PORTS_INPUT
+# Forward all TCP ports
+iptables -t nat -A PREROUTING -p tcp --dport 1:65535 -j DNAT --to-destination $CLIENT_IP
+echo "All TCP ports forwarded to $CLIENT_IP"
 
-# Convert the comma-separated input into an array
-IFS=',' read -r -a PORTS <<< "$PORTS_INPUT"
-
-# Loop through each port and add iptables rule
-for PORT in "${PORTS[@]}"; do
-    iptables -t nat -A PREROUTING -p tcp --dport $PORT -j DNAT --to-destination $CLIENT_IP:$PORT
-    echo "Port $PORT forwarded to $CLIENT_IP"
-done
+# Forward all UDP ports
+iptables -t nat -A PREROUTING -p udp --dport 1:65535 -j DNAT --to-destination $CLIENT_IP
+echo "All UDP ports forwarded to $CLIENT_IP"
 
 # Save iptables rules
 iptables-save > /etc/iptables/rules.v4
