@@ -103,7 +103,6 @@ if [[ ! -e /etc/openvpn/server/server.conf ]]; then
 	# Detect some Debian minimal setups where neither wget nor curl are installed
 	if ! hash wget 2>/dev/null && ! hash curl 2>/dev/null; then
 		echo "Wget is required to use this installer."
-		read -n1 -r -p "Press any key to install Wget and continue..."
 		apt-get update
 		apt-get install -y wget
 	fi
