@@ -10,10 +10,10 @@
 		exit
 	fi
 
-	# Discard stdin. Needed when running from an one-liner which includes a newline
+	# Discard stdin to avoid unexpected inputs
 	read -N 999999 -t 0.001
 
-	# Detect OS
+	# Detect operating system and version
 	if grep -qs "ubuntu" /etc/os-release; then
 		os="ubuntu"
 		os_version=$(grep 'VERSION_ID' /etc/os-release | cut -d '"' -f 2 | tr -d '.')
@@ -31,55 +31,47 @@
 		os_version=$(grep -oE '[0-9]+' /etc/fedora-release | head -1)
 		group_name="nobody"
 	else
-		echo "This installer seems to be running on an unsupported distribution.
-	Supported distros are Ubuntu, Debian, AlmaLinux, Rocky Linux, CentOS and Fedora."
+		echo "Unsupported distribution. Supported distros: Ubuntu, Debian, AlmaLinux, Rocky Linux, CentOS, and Fedora."
 		exit
 	fi
 
+	# Ensure minimum version requirements
 	if [[ "$os" == "ubuntu" && "$os_version" -lt 2204 ]]; then
-		echo "Ubuntu 22.04 or higher is required to use this installer.
-	This version of Ubuntu is too old and unsupported."
+		echo "Ubuntu 22.04 or higher is required."
 		exit
 	fi
 
-	if [[ "$os" == "debian" ]]; then
-		if grep -q '/sid' /etc/debian_version; then
-			echo "Debian Testing and Debian Unstable are unsupported by this installer."
-			exit
-		fi
-		if [[ "$os_version" -lt 11 ]]; then
-			echo "Debian 11 or higher is required to use this installer.
-	This version of Debian is too old and unsupported."
-			exit
-		fi
+	if [[ "$os" == "debian" && "$os_version" -lt 11 ]]; then
+		echo "Debian 11 or higher is required."
+		exit
 	fi
 
 	if [[ "$os" == "centos" && "$os_version" -lt 9 ]]; then
 		os_name=$(sed 's/ release.*//' /etc/almalinux-release /etc/rocky-release /etc/centos-release 2>/dev/null | head -1)
-		echo "$os_name 9 or higher is required to use this installer.
-	This version of $os_name is too old and unsupported."
+		echo "$os_name 9 or higher is required."
 		exit
 	fi
 
-	# Detect environments where $PATH does not include the sbin directories
+	# Ensure sbin directories are included in $PATH
 	if ! grep -q sbin <<< "$PATH"; then
-		echo '$PATH does not include sbin. Try using "su -" instead of "su".'
+		echo 'Add sbin to $PATH. Try using "su -" instead of "su".'
 		exit
 	fi
 
+	# Ensure script is run as root
 	if [[ "$EUID" -ne 0 ]]; then
-		echo "This installer needs to be run with superuser privileges."
+		echo "This installer requires superuser privileges."
 		exit
 	fi
 
+	# Ensure TUN device is available
 	if [[ ! -e /dev/net/tun ]] || ! ( exec 7<>/dev/net/tun ) 2>/dev/null; then
-		echo "The system does not have the TUN device available.
-	TUN needs to be enabled before running this installer."
+		echo "TUN device is unavailable. Enable TUN before proceeding."
 		exit
 	fi
 
 	new_client () {
-		# Generates the custom client.ovpn
+		# Generates the custom client.ovpn file
 		{
 		cat /etc/openvpn/server/client-common.txt
 		echo "<ca>"
@@ -94,25 +86,25 @@
 		echo "<tls-crypt>"
 		sed -ne '/BEGIN OpenVPN Static key/,$ p' /etc/openvpn/server/tc.key
 		echo "</tls-crypt>"
-		} > ~/$client.ovpn
+		} > ~/"ahmedvpn.ovpn" # Name the generated file as ahmedvpn.ovpn
 	}
 
 	if [[ ! -e /etc/openvpn/server/server.conf ]]; then
-		# Install wget if not available
+		# Install wget if it's not available
 		if ! hash wget 2>/dev/null; then
 			apt-get update
 			apt-get install -y wget
 		fi
 
-		# Automatically configure variables
+		# Automatically configure default variables
 		ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | head -1)
 		ip6=$(ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}' | head -1)
 		protocol="udp"
 		port="1194"
-		dns="1" # Use current system resolvers by default
+		dns="1.1.1.1" # Set DNS to Cloudflare
 		client="client"
 
-		# Install a firewall if required
+		# Install and configure a firewall if necessary
 		if ! systemctl is-active --quiet firewalld.service && ! hash iptables 2>/dev/null; then
 			if [[ "$os" == "centos" || "$os" == "fedora" ]]; then
 				firewall="firewalld"
@@ -125,7 +117,7 @@
 			fi
 		fi
 
-		# Continue with the rest of the installation logic (not provided here)
+		# Continue with the rest of the installation logic
 	fi
 
 	read -n1 -r -p "Press any key to continue..."
